@@ -1,25 +1,16 @@
-/* WQRT-12 Provincial Survey — analog CYOA. Hidden d20. Typed intent. */
+/* The Pale March — typed trail, visible d20, analog horror. No pages. */
 (function () {
   const $ = function (id) { return document.getElementById(id); };
-  const GATE = "ad472ef360d068c68d7c8fe31a08ecc03a7c29e9c878cc6235387920473b7ccf";
-  const IMAGES = {
-    road: "assets/survey-road.jpg",
-    river: "assets/survey-river.jpg",
-    camp: "assets/survey-camp.jpg",
+  const GATE = "5ff171d62e4d576f6e870020a480f1acac85e8b3f9a2950fd27c73cd632e1897";
+  const IMG = {
+    road: "assets/road.jpg",
+    woods: "assets/woods.jpg",
     village: "assets/village.jpg",
-    church: "assets/church-empty.jpg",
-    pastor: "assets/church-pastor.jpg",
-    tower: "assets/tower.jpg",
-    fence: "assets/tower-figure.jpg",
-    studio: "assets/cam3-empty.jpg",
-    occupied: "assets/cam3-occupied.jpg",
-    ray: "assets/cam3-ray.jpg",
-    sat: "assets/sat-ray.jpg",
-    satEmpty: "assets/sat-empty.jpg",
-    door: "assets/door.jpg",
-    parking: "assets/parking.jpg",
-    shop: "assets/shop-empty.jpg",
-    polaroid: "assets/ray.jpg"
+    camp: "assets/camp.jpg",
+    river: "assets/river.jpg",
+    chapel: "assets/chapel.jpg",
+    gate: "assets/gate.jpg",
+    figures: "assets/figures.jpg"
   };
 
   const state = {
@@ -28,21 +19,20 @@
     food: 12,
     oil: 8,
     miles: 0,
-    page: 12,
-    lastPage: null,
+    loc: "road",
+    lastLoc: null,
     marked: false,
     blessed: false,
     viewed: 2,
     moves: 0,
     ended: false,
     busy: false,
-    ghosted: false,
     visited: {},
     debug: /[?&]go=1/.test(location.search)
   };
 
-  function escapeName() {
-    return String(state.name || "UNLOGGED").replace(/\s+/g, " ").trim().slice(0, 22) || "UNLOGGED";
+  function you() {
+    return String(state.name || "UNLOGGED").replace(/\s+/g, " ").trim().slice(0, 16) || "UNLOGGED";
   }
   function live() { return state.party.filter(function (p) { return p.alive; }); }
   function others() { return state.party.filter(function (p) { return p.alive && !p.you; }); }
@@ -71,25 +61,55 @@
   function secretRoll(dc) {
     const d = 1 + Math.floor(Math.random() * 20);
     let mod = 0;
-    if (state.food <= 2) mod -= 2;
-    if (state.oil <= 0) mod -= 1;
-    if (live().length <= 2) mod -= 1;
-    if (state.marked) mod -= 2;
-    if (state.blessed) mod += 2;
+    const why = [];
+    if (state.food <= 2) { mod -= 2; why.push("starved -2"); }
+    if (state.oil <= 0) { mod -= 1; why.push("dark -1"); }
+    if (live().length <= 2) { mod -= 1; why.push("thin party -1"); }
+    if (state.marked) { mod -= 2; why.push("named -2"); }
+    if (state.blessed) { mod += 2; why.push("blessed +2"); }
     const total = d + mod;
     const fumble = d === 1;
     const crit = d === 20;
-    return { d: d, mod: mod, total: total, dc: dc, ok: crit || (!fumble && total >= dc), crit: crit, fumble: fumble };
+    return {
+      d: d, mod: mod, why: why, total: total, dc: dc,
+      ok: crit || (!fumble && total >= dc), crit: crit, fumble: fumble
+    };
+  }
+
+  function showDie(roll) {
+    return new Promise(function (resolve) {
+      const el = $("die");
+      el.className = "die rolling";
+      $("die-need").textContent = "need " + roll.dc;
+      $("die-mod").textContent = roll.why.length ? roll.why.join(" · ") : "mod 0";
+      $("die-result").textContent = "";
+      $("die-result").className = "die-result";
+      let n = 0;
+      const iv = setInterval(function () {
+        el.textContent = String(1 + Math.floor(Math.random() * 20));
+        n += 1;
+        if (n >= 14) {
+          clearInterval(iv);
+          el.textContent = String(roll.d);
+          el.className = "die " + (roll.ok ? "hit" : "miss");
+          var line = roll.d + (roll.mod ? (roll.mod > 0 ? "+" + roll.mod : String(roll.mod)) : "") + " = " + roll.total;
+          $("die-result").textContent = roll.ok ? line + "  HOLDS" : line + "  TEARS";
+          $("die-result").className = "die-result " + (roll.ok ? "hit" : "miss");
+          journal("d20 " + roll.d + " vs " + roll.dc + (roll.mod ? " (" + roll.mod + ")" : "") + " → " + (roll.ok ? "HOLDS" : "TEARS"), "roll");
+          resolve();
+        }
+      }, 65);
+    });
   }
 
   function intent(raw) {
     const t = String(raw || "").toLowerCase();
     if (!t.trim()) return "wait";
-    if (t.indexOf(escapeName().toLowerCase()) !== -1 && escapeName() !== "UNLOGGED") state.marked = true;
-    if (/\b(go back|rewind|turn back|previous page|last page)\b/.test(t)) return "back";
+    if (you() !== "UNLOGGED" && t.indexOf(you().toLowerCase()) !== -1) state.marked = true;
+    if (/\b(go back|rewind|turn back|previous)\b/.test(t)) return "back";
     if (/\b(look away|don't look|do not look|cover (my )?eyes|avert)\b/.test(t)) return "avert";
     if (/\b(are you there|who is watching|can you hear|who are you)\b/.test(t)) return "meta";
-    if (/\b(inventory|status|supplies|how many)\b/.test(t)) return "status";
+    if (/\b(inventory|status|supplies)\b/.test(t)) return "status";
     if (/\b(follow|tracks)\b/.test(t)) return "follow";
     if (/\b(ford|cross|wade|swim|river)\b/.test(t)) return "ford";
     if (/\b(hunt|shoot|track|forage)\b/.test(t)) return "hunt";
@@ -97,12 +117,12 @@
     if (/\b(pray|bless|holy|god|hymn)\b/.test(t)) return "pray";
     if (/\b(run|flee|leave|walk away)\b/.test(t)) return "leave";
     if (/\b(enter|go in|inside|approach)\b/.test(t)) return "enter";
-    if (/\b(talk|ask|call|shout|speak|hello|who is)\b/.test(t)) return "talk";
+    if (/\b(talk|ask|call|shout|speak|hello)\b/.test(t)) return "talk";
     if (/\b(look|watch|stare|peer|see|inspect|examine|count)\b/.test(t)) return "look";
     if (/\b(continue|keep going|travel|march|forward|onward|wagon|go on)\b/.test(t)) return "travel";
-    if (/\b(wait|stay|listen|nothing)\b/.test(t)) return "wait";
-    if (/\b(attack|kill|burn|destroy|shoot it)\b/.test(t)) return "attack";
-    if (/\b(deliver|offer|give|reliquary)\b/.test(t)) return "deliver";
+    if (/\b(wait|stay|listen)\b/.test(t)) return "wait";
+    if (/\b(attack|kill|burn|destroy)\b/.test(t)) return "attack";
+    if (/\b(deliver|offer|give|crate|reliquary)\b/.test(t)) return "deliver";
     return "improv";
   }
 
@@ -127,337 +147,253 @@
   }
 
   function scare() {
-    WQRTAudio.stinger();
-    WQRTAudio.setPlace("scare");
+    TapeAudio.stinger();
+    TapeAudio.setPlace("scare");
     $("tape-flash").style.opacity = "1";
-    $("tape-scare").style.backgroundImage = "url(" + IMAGES.occupied + ")";
+    $("tape-scare").style.backgroundImage = "url(" + IMG.figures + ")";
     $("tape-scare").classList.add("on");
     setTimeout(function () { $("tape-flash").style.opacity = "0"; }, 70);
     setTimeout(function () { $("tape-scare").classList.remove("on"); }, 420);
   }
 
-  function cutTo(page, then) {
-    const shown = Math.random() < 0.18 ? page + 7 : page;
-    $("cut-page").textContent = "TURN TO PAGE " + shown;
+  function cutTo(title, then) {
+    $("cut-page").textContent = title;
     $("cut").classList.remove("hidden");
-    WQRTAudio.hitch();
-    setTimeout(function () {
-      if (shown !== page) $("cut-page").textContent = "TURN TO PAGE " + page;
-    }, 500);
+    TapeAudio.hitch();
     setTimeout(function () {
       $("cut").classList.add("hidden");
       then();
-    }, 1300);
+    }, 1200);
   }
 
   function playClip(spec, done) {
     setScene(spec.img, !!spec.fail);
     $("tape-cc").textContent = spec.caption || "";
     $("tape-label").textContent = spec.label || "";
-    const wait = spec.fail ? 3200 : 5200;
+    const wait = spec.fail ? 3000 : 4800;
     if (spec.scare) setTimeout(scare, Math.floor(wait * 0.55));
     setTimeout(done, wait);
   }
 
-  const NODES = {
-    12: {
-      title: "THE ROAD",
-      bed: "survey", place: "road", img: IMAGES.road,
-      body: "A wagon on a black road. Two horses. Dead trees. Something tall is already in the fog ahead, too far to name.\n\nThis printing does not tell you what to do. It waits for you to write it.",
-      caption: "PROVINCIAL SURVEY 1979  •  DAY 4",
+  const LOCS = {
+    road: {
+      name: "THE BLACK ROAD",
+      bed: "survey", place: "road", img: IMG.road,
+      body: "A wagon. Two horses. Dead trees. Something tall is already in the fog, too far to name.\n\nYou type what the march does. The die decides if the reel allows it. The same sentence can live or drown.",
+      caption: "DAY 4  •  THE MARCH",
       acts: {
-        travel: { dc: 10, ok: 19, bad: 23, okMiles: 11 },
-        look: { dc: 9, ok: 90, bad: 19, scareFail: true },
-        camp: { dc: 11, ok: 40, bad: 43 },
-        hunt: { dc: 12, ok: 19, bad: 23, okFood: 2 },
-        leave: { dc: 14, ok: 23, bad: 25 },
-        talk: { dc: 15, ok: 80, bad: 12 },
-        avert: { dc: 11, ok: 19, bad: 90, scareFail: true },
-        improv: { dc: 13, ok: 19, bad: 23 }
+        travel: { dc: 10, ok: "village", bad: "woods", miles: 12 },
+        look: { dc: 9, ok: "gate", bad: "village", scareFail: true },
+        camp: { dc: 11, ok: "camp", bad: "fifth" },
+        hunt: { dc: 12, ok: "village", bad: "woods", food: 2 },
+        leave: { dc: 14, ok: "woods", bad: "figures" },
+        talk: { dc: 15, ok: "named", bad: "road" },
+        avert: { dc: 11, ok: "village", bad: "gate", scareFail: true },
+        improv: { dc: 13, ok: "village", bad: "woods" }
       }
     },
-    19: {
-      title: "CANDLE TOWN",
-      bed: "weather", place: "village", img: IMAGES.village,
-      body: "Every window has a candle. Nobody is in the street. Wagon ruts come in. They do not come out.\n\nThe well has a ring of birds on it that do not fly.",
-      caption: "LANDMARK  •  UNNAMED",
-      acts: {
-        enter: { dc: 12, ok: 50, bad: 54 },
-        travel: { dc: 10, ok: 60, bad: 23, okMiles: 9 },
-        leave: { dc: 10, ok: 60, bad: 23 },
-        look: { dc: 8, ok: 54, bad: 25, scareFail: true },
-        talk: { dc: 14, ok: 50, bad: 43 },
-        camp: { dc: 13, ok: 40, bad: 43 },
-        pray: { dc: 11, ok: 50, bad: 54 },
-        avert: { dc: 10, ok: 60, bad: 54 },
-        improv: { dc: 13, ok: 50, bad: 23 }
-      }
-    },
-    23: {
-      title: "THE WOODS REPEAT",
-      bed: "quiet", place: "woods", img: IMAGES.road,
-      body: "You have been here. The same oak. The same rut. The miles on your log do not agree with the trees.\n\nIf you try to go back, the road will pretend to allow it.",
+    woods: {
+      name: "THE WOODS REPEAT",
+      bed: "quiet", place: "woods", img: IMG.woods,
+      body: "The same oak. The same rut. Your miles do not agree with the trees.\n\nIf you try to go back, the road will pretend to allow it.",
       caption: "DAY 4  •  AGAIN",
       acts: {
-        back: { dc: 14, ok: 12, bad: 24 },
-        travel: { dc: 13, ok: 19, bad: 24, okMiles: 4 },
-        look: { dc: 10, ok: 24, bad: 25, scareFail: true },
-        camp: { dc: 12, ok: 40, bad: 43 },
-        hunt: { dc: 13, ok: 19, bad: 25, okFood: 1 },
-        leave: { dc: 12, ok: 60, bad: 25 },
-        improv: { dc: 14, ok: 24, bad: 25 }
+        back: { dc: 14, ok: "road", bad: "figures" },
+        travel: { dc: 13, ok: "village", bad: "figures", miles: 5 },
+        look: { dc: 10, ok: "camp", bad: "figures", scareFail: true },
+        camp: { dc: 12, ok: "camp", bad: "fifth" },
+        hunt: { dc: 13, ok: "village", bad: "figures", food: 1 },
+        leave: { dc: 12, ok: "ford", bad: "figures" },
+        follow: { dc: 13, ok: "camp", bad: "figures" },
+        improv: { dc: 14, ok: "camp", bad: "figures" }
       }
     },
-    24: {
-      title: "TRACKS",
-      bed: "survey", place: "woods", img: IMAGES.camp,
-      body: "Five sets. You can account for four.\n\nThe fifth set is walking backward.",
-      caption: "COUNT THEM",
+    village: {
+      name: "CANDLE TOWN",
+      bed: "weather", place: "village", img: IMG.village,
+      body: "Every window has a candle. Nobody is in the street. Ruts come in. They do not come out.\n\nBirds on the well do not fly.",
+      caption: "UNNAMED SETTLEMENT",
       acts: {
-        look: { dc: 10, ok: 43, bad: 25, scareFail: true },
-        follow: { dc: 13, ok: 40, bad: 70 },
-        travel: { dc: 12, ok: 40, bad: 70 },
-        leave: { dc: 13, ok: 60, bad: 25 },
-        talk: { dc: 15, ok: 43, bad: 45 },
-        camp: { dc: 11, ok: 40, bad: 43 },
-        improv: { dc: 13, ok: 40, bad: 70 }
+        enter: { dc: 12, ok: "chapel", bad: "chapel" },
+        travel: { dc: 10, ok: "ford", bad: "woods", miles: 10 },
+        leave: { dc: 10, ok: "ford", bad: "woods" },
+        look: { dc: 8, ok: "chapel", bad: "figures", scareFail: true },
+        talk: { dc: 14, ok: "chapel", bad: "fifth" },
+        camp: { dc: 13, ok: "camp", bad: "fifth" },
+        pray: { dc: 11, ok: "chapel", bad: "chapel" },
+        avert: { dc: 10, ok: "ford", bad: "chapel" },
+        improv: { dc: 13, ok: "chapel", bad: "woods" }
       }
     },
-    25: {
-      title: "SOMETHING ELSE IS HUNTING",
-      bed: "cam3", place: "woods", img: IMAGES.occupied,
-      body: "The tape jumps. For a moment the survey is a room that has not been built yet. Three people stand in a light that does not belong on the trail.\n\nThey are waiting for a decision you have not typed.",
-      caption: "THIS FRAME WAS NOT IN THE REEL",
-      scareOnEnter: true,
-      acts: {
-        avert: { dc: 12, ok: 23, bad: 70, scareFail: true },
-        look: { dc: 7, ok: 70, bad: 70, scareFail: true },
-        run: { dc: 14, ok: 60, bad: 70 },
-        leave: { dc: 14, ok: 60, bad: 70 },
-        talk: { dc: 16, ok: 80, bad: 45 },
-        improv: { dc: 15, ok: 23, bad: 70 }
-      }
-    },
-    40: {
-      title: "CAMP",
-      bed: "faith", place: "camp", img: IMAGES.camp,
-      body: "Fire. Wagon. Four of you. The caption will lie about the number if you let it run.\n\nSomeone is seated just outside the light.",
+    camp: {
+      name: "THE FIRE",
+      bed: "faith", place: "camp", img: IMG.camp,
+      body: "Four of you. The caption may count five.\n\nSomeone is seated just outside the light.",
       caption: "FIVE AT THE FIRE",
       acts: {
-        camp: { dc: 12, ok: 60, bad: 43, okMiles: 6 },
-        look: { dc: 10, ok: 43, bad: 45, scareFail: true },
-        talk: { dc: 14, ok: 43, bad: 45 },
-        hunt: { dc: 12, ok: 40, bad: 25, okFood: 2 },
-        pray: { dc: 11, ok: 50, bad: 43 },
-        leave: { dc: 11, ok: 60, bad: 23 },
-        avert: { dc: 12, ok: 60, bad: 43 },
-        improv: { dc: 13, ok: 60, bad: 43 }
+        camp: { dc: 12, ok: "ford", bad: "fifth", miles: 6 },
+        look: { dc: 10, ok: "fifth", bad: "named", scareFail: true },
+        talk: { dc: 14, ok: "fifth", bad: "named" },
+        hunt: { dc: 12, ok: "camp", bad: "figures", food: 2 },
+        pray: { dc: 11, ok: "chapel", bad: "fifth" },
+        leave: { dc: 11, ok: "ford", bad: "woods" },
+        avert: { dc: 12, ok: "ford", bad: "fifth" },
+        improv: { dc: 13, ok: "ford", bad: "fifth" }
       }
     },
-    43: {
-      title: "THE FIFTH",
-      bed: "quiet", place: "camp", img: IMAGES.camp,
-      body: "It has no face you can keep. When you try to describe it, the log writes a name you already used.\n\nIt is sitting where a companion should sit.",
-      caption: "DO NOT IDENTIFY THE FIFTH",
+    fifth: {
+      name: "THE FIFTH",
+      bed: "quiet", place: "camp", img: IMG.camp,
+      body: "It has no face you can keep. When you try to describe it, the log writes a name you already used.",
+      caption: "DO NOT NAME IT",
       acts: {
-        talk: { dc: 16, ok: 80, bad: 45 },
-        look: { dc: 8, ok: 45, bad: 25, scareFail: true },
-        attack: { dc: 15, ok: 60, bad: 70, killFail: true },
-        leave: { dc: 13, ok: 60, bad: 25 },
-        pray: { dc: 14, ok: 50, bad: 45 },
-        avert: { dc: 12, ok: 40, bad: 45 },
-        camp: { dc: 14, ok: 45, bad: 45 },
-        improv: { dc: 15, ok: 60, bad: 45 }
+        talk: { dc: 16, ok: "named", bad: "named" },
+        look: { dc: 8, ok: "named", bad: "figures", scareFail: true },
+        attack: { dc: 15, ok: "ford", bad: "figures", killFail: true },
+        leave: { dc: 13, ok: "ford", bad: "figures" },
+        pray: { dc: 14, ok: "chapel", bad: "named" },
+        avert: { dc: 12, ok: "camp", bad: "named" },
+        camp: { dc: 14, ok: "named", bad: "named" },
+        improv: { dc: 15, ok: "ford", bad: "named" }
       }
     },
-    45: {
-      title: "IT USED YOUR NAME",
-      bed: "sat", place: "tape", img: IMAGES.sat,
-      body: "The fifth does not speak with a mouth. The closed-caption does.\n\nIt is spelling you. The survey has stopped being about the valley.",
+    named: {
+      name: "IT USED YOUR NAME",
+      bed: "sat", place: "tape", img: IMG.figures,
+      body: "The fifth does not speak with a mouth. The caption does. It is spelling you.\n\nThe march has stopped being about the crate.",
       caption: "",
       namedCaption: true,
       acts: {
-        meta: { dc: 1, ok: 80, bad: 80 },
-        talk: { dc: 15, ok: 80, bad: 70 },
-        avert: { dc: 13, ok: 40, bad: 70, scareFail: true },
-        look: { dc: 9, ok: 70, bad: 70, scareFail: true },
-        leave: { dc: 16, ok: 12, bad: 70 },
-        improv: { dc: 14, ok: 80, bad: 70 }
+        meta: { dc: 1, ok: "gate", bad: "gate" },
+        talk: { dc: 15, ok: "gate", bad: "figures" },
+        avert: { dc: 13, ok: "camp", bad: "figures", scareFail: true },
+        look: { dc: 9, ok: "figures", bad: "figures", scareFail: true },
+        leave: { dc: 16, ok: "road", bad: "figures" },
+        improv: { dc: 14, ok: "gate", bad: "figures" }
       }
     },
-    50: {
-      title: "VALLEY FAITH HOUR",
-      bed: "faith", place: "church", img: IMAGES.pastor,
-      body: "The Sunday tape is running in a town with no congregation. The pastor is already looking at the lens.\n\nHe will wait as long as you watch.",
-      caption: "LET US LOOK TOGETHER",
+    chapel: {
+      name: "THE SUNK CHAPEL",
+      bed: "faith", place: "church", img: IMG.chapel,
+      body: "Stone in mud. One candle. No congregation. If you pray, you are asking the same thing the well-birds asked.",
+      caption: "UNLIT NAVE",
       acts: {
-        pray: { dc: 11, ok: 90, bad: 54, bless: true },
-        look: { dc: 8, ok: 54, bad: 54, scareFail: true },
-        avert: { dc: 12, ok: 60, bad: 54, scareFail: true },
-        leave: { dc: 10, ok: 60, bad: 54 },
-        talk: { dc: 14, ok: 54, bad: 45 },
-        enter: { dc: 10, ok: 54, bad: 54 },
-        improv: { dc: 12, ok: 90, bad: 54 }
+        pray: { dc: 11, ok: "gate", bad: "figures", bless: true },
+        look: { dc: 8, ok: "figures", bad: "figures", scareFail: true },
+        enter: { dc: 10, ok: "gate", bad: "figures" },
+        leave: { dc: 10, ok: "ford", bad: "woods" },
+        talk: { dc: 14, ok: "named", bad: "figures" },
+        avert: { dc: 12, ok: "ford", bad: "figures", scareFail: true },
+        improv: { dc: 12, ok: "gate", bad: "figures" }
       }
     },
-    54: {
-      title: "HE DOES NOT BLINK",
-      bed: "faith", place: "church", img: IMAGES.pastor,
-      body: "The hold is too long for a broadcast. The candle does not drip. Your prompt is still there. He is using it.",
-      caption: "LET US LOOK TOGETHER",
-      scareOnEnter: true,
+    ford: {
+      name: "THE BLACK FORD",
+      bed: "survey", place: "river", img: IMG.river,
+      body: "The river is not on your map. Faces just under the water, eyes open, not drowning.\n\nWagons have crossed. Wagons are still crossing.",
+      caption: "NOT ON THE MAP",
       acts: {
-        avert: { dc: 13, ok: 60, bad: 70, scareFail: true },
-        look: { dc: 6, ok: 70, bad: 70, scareFail: true },
-        pray: { dc: 14, ok: 90, bad: 70, bless: true },
-        leave: { dc: 12, ok: 60, bad: 70 },
-        attack: { dc: 16, ok: 60, bad: 70 },
-        improv: { dc: 14, ok: 60, bad: 70 }
+        ford: { dc: 14, ok: "gate", bad: "under", miles: 14, killFail: true },
+        look: { dc: 7, ok: "under", bad: "under", scareFail: true },
+        avert: { dc: 11, ok: "gate", bad: "under" },
+        wait: { dc: 12, ok: "gate", bad: "under" },
+        pray: { dc: 12, ok: "gate", bad: "under", bless: true },
+        leave: { dc: 13, ok: "woods", bad: "under" },
+        travel: { dc: 14, ok: "gate", bad: "under", miles: 14 },
+        improv: { dc: 14, ok: "gate", bad: "under" }
       }
     },
-    60: {
-      title: "THE FORD",
-      bed: "survey", place: "river", img: IMAGES.river,
-      body: "The river is not on the map you were given. Faces just under the black water, eyes open, not drowning.\n\nWagons have crossed here. Wagons are still crossing.",
-      caption: "THE FORD WAS NOT ON THE MAP",
-      acts: {
-        ford: { dc: 14, ok: 90, bad: 61, okMiles: 14, killFail: true },
-        look: { dc: 7, ok: 63, bad: 63, scareFail: true },
-        avert: { dc: 11, ok: 90, bad: 61 },
-        wait: { dc: 12, ok: 90, bad: 61 },
-        pray: { dc: 12, ok: 90, bad: 61, bless: true },
-        leave: { dc: 13, ok: 23, bad: 61 },
-        travel: { dc: 14, ok: 90, bad: 61, okMiles: 14 },
-        improv: { dc: 14, ok: 90, bad: 61 }
-      }
-    },
-    61: {
-      title: "THE WAGON GOES UNDER",
-      bed: "quiet", place: "river", img: IMAGES.river,
-      body: "The lantern is still lit. It is under the water and it is still lit.\n\nSomeone is missing from the party line. The tape did not cut.",
+    under: {
+      name: "UNDER THE LANTERN",
+      bed: "quiet", place: "river", img: IMG.river,
+      body: "The lantern is still lit. It is under the water and it is still lit.\n\nSomeone is missing from the party line.",
       caption: "LOST AT THE FORD",
       scareOnEnter: true,
       acts: {
-        ford: { dc: 16, ok: 90, bad: 63, killFail: true },
-        look: { dc: 8, ok: 63, bad: 63, scareFail: true },
-        leave: { dc: 14, ok: 23, bad: 63 },
-        pray: { dc: 13, ok: 90, bad: 63 },
-        improv: { dc: 15, ok: 90, bad: 63 }
+        ford: { dc: 16, ok: "gate", bad: "figures", killFail: true },
+        look: { dc: 8, ok: "figures", bad: "figures", scareFail: true },
+        leave: { dc: 14, ok: "woods", bad: "figures" },
+        pray: { dc: 13, ok: "gate", bad: "figures" },
+        improv: { dc: 15, ok: "gate", bad: "figures" }
       }
     },
-    63: {
-      title: "YOU ARE IN THE WATER",
-      bed: "cam3", place: "river", img: IMAGES.river,
-      body: "One of the faces is the operator. One of the faces is you. The printing does not say which is which.\n\nIf you keep watching, the ford will finish without you.",
-      caption: "",
-      namedCaption: true,
+    figures: {
+      name: "THEY WERE WAITING",
+      bed: "cam3", place: "woods", img: IMG.figures,
+      body: "Three of them in lantern light. Mouths open as if a signal is going in. This is not a room you sit in. This is what the march walks into when the die tears.",
+      caption: "NOT A STUDIO",
       scareOnEnter: true,
       acts: {
-        avert: { dc: 14, ok: 90, bad: 70, scareFail: true },
-        look: { dc: 6, ok: 70, bad: 70, scareFail: true },
-        ford: { dc: 17, ok: 90, bad: 70, killFail: true },
-        leave: { dc: 15, ok: 12, bad: 70 },
-        improv: { dc: 16, ok: 90, bad: 70 }
+        avert: { dc: 12, ok: "woods", bad: "named", scareFail: true },
+        look: { dc: 7, ok: "named", bad: "named", scareFail: true },
+        leave: { dc: 14, ok: "ford", bad: "named" },
+        talk: { dc: 16, ok: "named", bad: "named" },
+        attack: { dc: 16, ok: "gate", bad: "named" },
+        improv: { dc: 15, ok: "woods", bad: "named" }
       }
     },
-    70: {
-      title: "CAMERA 3",
-      bed: "cam3", place: "studio", img: IMAGES.occupied,
-      body: "You walked into a building that is not on the trail. Three figures in a cone of light. Their mouths are open as if a signal is going in.\n\nThis is not a night you have to survive. This is a page you were not supposed to reach.",
-      caption: "CAMERA 3  •  LIVE TALLY",
-      scareOnEnter: true,
+    gate: {
+      name: "THE GATE",
+      bed: "sat", place: "tower", img: IMG.gate,
+      body: "Iron in stone. The crate is at your feet. A pale figure already stands inside, too still.\n\nThis is where the march was supposed to end.",
+      caption: "THE FENCE TAKES OFFERINGS",
       acts: {
-        leave: { dc: 15, ok: 90, bad: 80 },
-        look: { dc: 8, ok: 80, bad: 80, scareFail: true },
-        talk: { dc: 14, ok: 80, bad: 45 },
-        avert: { dc: 13, ok: 12, bad: 80, scareFail: true },
-        attack: { dc: 16, ok: 90, bad: 80 },
-        improv: { dc: 15, ok: 80, bad: 80 }
+        deliver: { dc: 15, ok: "end-deliver", bad: "inside" },
+        enter: { dc: 14, ok: "inside", bad: "figures" },
+        look: { dc: 9, ok: "inside", bad: "inside", scareFail: true },
+        attack: { dc: 14, ok: "end-dark", bad: "inside" },
+        leave: { dc: 16, ok: "road", bad: "inside" },
+        pray: { dc: 13, ok: "end-deliver", bad: "inside", bless: true },
+        talk: { dc: 15, ok: "inside", bad: "figures" },
+        improv: { dc: 14, ok: "inside", bad: "figures" }
       }
     },
-    80: {
-      title: "CONTINUITY",
-      bed: "sat", place: "sat", img: IMAGES.sat,
-      body: "A gray room. A man who looks like the one who left the note. He is reading a procedure that names the chair, not the trail.\n\nHe looks up when you type.",
-      caption: "IF YOU ARE READING THIS YOU ARE THE OPERATOR",
-      acts: {
-        look: { dc: 10, ok: 70, bad: 70, scareFail: true },
-        avert: { dc: 12, ok: 12, bad: 70 },
-        talk: { dc: 13, ok: 90, bad: 70 },
-        leave: { dc: 14, ok: 12, bad: 70 },
-        deliver: { dc: 12, ok: 90, bad: 70 },
-        meta: { dc: 1, ok: 90, bad: 70 },
-        improv: { dc: 13, ok: 90, bad: 70 }
-      }
-    },
-    90: {
-      title: "THE TOWER",
-      bed: "sat", place: "tower", img: IMAGES.tower,
-      body: "The transmitter on the hill. Red lights. Gravel. This is where the survey was supposed to end: a sealed thing delivered to a locked fence.\n\nA figure is already inside.",
-      caption: "WQRT TRANSMITTER  •  FWD POWER OK",
-      acts: {
-        deliver: { dc: 15, ok: 100, bad: 91 },
-        enter: { dc: 14, ok: 91, bad: 70 },
-        look: { dc: 9, ok: 91, bad: 91, scareFail: true },
-        attack: { dc: 14, ok: 101, bad: 91 },
-        leave: { dc: 16, ok: 12, bad: 91 },
-        pray: { dc: 13, ok: 100, bad: 91, bless: true },
-        talk: { dc: 15, ok: 91, bad: 70 },
-        improv: { dc: 14, ok: 91, bad: 70 }
-      }
-    },
-    91: {
-      title: "INSIDE THE FENCE",
-      bed: "quiet", place: "tower", img: IMAGES.fence,
-      body: "The figure has a pale face that does not match the night. It does not come closer. It does not need to. The tower is using it the way a camera uses a body.\n\nYou can still type. That is the only door left.",
+    inside: {
+      name: "INSIDE THE GATE",
+      bed: "quiet", place: "tower", img: IMG.gate,
+      body: "The figure does not come closer. It does not need to. The crate is behind you now, or it is in its hands. You can still type. That is the only door left.",
       caption: "ONE FIGURE",
       scareOnEnter: true,
       acts: {
-        deliver: { dc: 16, ok: 100, bad: 102 },
-        look: { dc: 8, ok: 102, bad: 102, scareFail: true },
-        avert: { dc: 14, ok: 100, bad: 102 },
-        leave: { dc: 17, ok: 12, bad: 102 },
-        attack: { dc: 15, ok: 101, bad: 102 },
-        talk: { dc: 14, ok: 80, bad: 102 },
-        improv: { dc: 16, ok: 100, bad: 102 }
+        deliver: { dc: 16, ok: "end-deliver", bad: "end-tape" },
+        look: { dc: 8, ok: "end-tape", bad: "end-tape", scareFail: true },
+        avert: { dc: 14, ok: "end-deliver", bad: "end-tape" },
+        leave: { dc: 17, ok: "road", bad: "end-tape" },
+        attack: { dc: 15, ok: "end-dark", bad: "end-tape" },
+        talk: { dc: 14, ok: "named", bad: "end-tape" },
+        improv: { dc: 16, ok: "end-deliver", bad: "end-tape" }
       }
     }
   };
 
-  // follow maps to travel if missing
-  NODES[24].acts.follow = NODES[24].acts.travel;
-  NODES[25].acts.run = NODES[25].acts.leave;
-
-  function showNode(id) {
-    const node = NODES[id];
-    if (!node) { ending("missing"); return; }
-    state.lastPage = state.page;
-    state.page = id;
+  function showLoc(id) {
+    const loc = LOCS[id];
+    if (!loc) { ending("missing"); return; }
+    state.lastLoc = state.loc;
+    state.loc = id;
     state.visited[id] = (state.visited[id] || 0) + 1;
-    $("page-num").textContent = "PAGE " + id;
-    $("page-burn").textContent = "P." + id;
-    $("tape-id").textContent = "VTR 2  •  SURVEY REEL  •  " + escapeName();
-    setScene(node.img, false);
-    $("tape-cc").textContent = node.namedCaption ? (escapeName() + ".") : (node.caption || "");
-    $("tape-label").textContent = node.title;
-    $("story").textContent = node.body;
+    $("place-name").textContent = loc.name;
+    $("reel-id").textContent = "REEL  •  " + you();
+    setScene(loc.img, false);
+    $("tape-cc").textContent = loc.namedCaption ? (you() + ".") : (loc.caption || "");
+    $("tape-label").textContent = loc.name;
+    $("story").textContent = loc.body;
     if (state.visited[id] > 1) {
-      $("story").textContent = node.body + "\n\nYou have been on this page. It is not the same printing.";
+      $("story").textContent = loc.body + "\n\nYou have been here. It is not the same recording.";
     }
-    WQRTAudio.setBed(node.bed);
-    WQRTAudio.setPlace(node.place);
-    WQRTAudio.setCorruption(Math.min(1, state.moves / 14 + (state.marked ? 0.2 : 0)));
+    TapeAudio.setBed(loc.bed);
+    TapeAudio.setPlace(loc.place);
+    TapeAudio.setCorruption(Math.min(1, state.moves / 14 + (state.marked ? 0.2 : 0)));
     $("tape-crawl-wrap").classList.add("on");
-    $("tape-crawl").textContent = "YOU ARE VIEWER " + state.viewed + "  —  DO NOT REWIND  —  " + escapeName() + " IS IN THE CHAIR  —  ";
-    if (node.scareOnEnter) setTimeout(scare, 700);
+    $("tape-crawl").textContent = "YOU ARE VIEWER " + state.viewed + "  —  DO NOT REWIND  —  " + you() + " WALKS  —  ";
+    if (loc.scareOnEnter) setTimeout(scare, 700);
     hud();
-    if (state.food <= 0 && id !== 61) journal("RATIONS GONE. THE NEXT MARCH WILL TAKE SOMEONE.", "ghost");
   }
 
   function ending(kind) {
     if (state.ended) return;
     state.ended = true;
-    const n = escapeName();
+    const n = you();
     const card = $("end-card");
     card.innerHTML = "";
     const code = document.createElement("div"); code.className = "code";
@@ -465,40 +401,40 @@
     const p = document.createElement("p");
     const p2 = document.createElement("p");
     const again = document.createElement("button");
-    again.textContent = "ANOTHER PRINTING";
+    again.textContent = "ANOTHER MARCH";
     again.onclick = function () { location.reload(); };
-    if (kind === "deliver") {
-      code.textContent = "ENDING  •  THE RELIQUARY";
-      h.textContent = "THE FENCE TAKES IT";
-      p.textContent = "You put the sealed thing through the gate. The figure did not move. Sign-on ran at 05:00 with your name on a staff slide Donna did not write.";
-      p2.textContent = n + ". Then the names of the people you lost. Then " + n + " again.";
-      setScene(IMAGES.tower, false);
-      WQRTAudio.setBed("shop");
-    } else if (kind === "dark") {
-      code.textContent = "ENDING  •  FWD POWER ZERO";
-      h.textContent = "THE LIGHTS STAYED ON";
-      p.textContent = "You tried to kill the tower. The obstruction lights did not care. The survey log lists you as missing and still on the reel.";
+    if (kind === "deliver" || kind === "end-deliver") {
+      code.textContent = "THE CRATE";
+      h.textContent = "THE GATE TAKES IT";
+      p.textContent = "You put the sealed thing through. The figure did not move. In the morning the log lists you as staff on a march that has not ended.";
+      p2.textContent = n + ". Then the names you lost. Then " + n + " again.";
+      setScene(IMG.gate, false);
+      TapeAudio.setBed("shop");
+    } else if (kind === "dark" || kind === "end-dark") {
+      code.textContent = "BROKEN OFFERING";
+      h.textContent = "THE FIGURE KEPT THE LIGHT";
+      p.textContent = "You tried to end it. The gate stayed shut from the inside. The log lists you missing and still on the reel.";
       p2.textContent = n + " last seen inside the fence.";
-      setScene(IMAGES.fence, false);
-      WQRTAudio.txKill();
-    } else if (kind === "tape") {
-      code.textContent = "ENDING  •  STILL RECORDING";
+      setScene(IMG.gate, false);
+      TapeAudio.txKill();
+    } else if (kind === "tape" || kind === "end-tape") {
+      code.textContent = "STILL RECORDING";
       h.textContent = "THE TAPE DOES NOT STOP";
-      p.textContent = "There are no more pages. The CRT stays live. In the crawl, viewer count is 1. That is you. That is also not you.";
+      p.textContent = "No more trail. The CRT stays live. Viewer count is 1. That is you. That is also not you.";
       p2.textContent = "Do not rewind.";
-      setScene(IMAGES.occupied, false);
+      setScene(IMG.figures, false);
     } else if (kind === "missing") {
-      code.textContent = "ENDING  •  PAGE REMOVED";
-      h.textContent = "THIS PAGE WAS CUT FROM YOUR PRINTING";
-      p.textContent = "The choice you typed does not exist in this copy. Someone already took that page. Their wagon is on Camera 3.";
-      p2.textContent = "You may start another printing. It will not have the same pages.";
-      setScene(IMAGES.studio, false);
+      code.textContent = "CUT FROM THE REEL";
+      h.textContent = "THAT ATTEMPT WAS REMOVED";
+      p.textContent = "The thing you typed does not exist on this copy. Someone already took that footage.";
+      p2.textContent = "Another march will not have the same ground.";
+      setScene(IMG.woods, false);
     } else {
-      code.textContent = "ENDING  •  THE CHAIR";
-      h.textContent = "YOU WERE NEVER ON THE TRAIL";
-      p.textContent = "The survey was footage. The wagon was a caption. You were in master control the whole time, typing into a log that went out over the air.";
-      p2.textContent = "WQRT-12 thanks overnight operator " + n + ".";
-      setScene(IMAGES.sat, false);
+      code.textContent = "WATCHING";
+      h.textContent = "YOU WERE NEVER ON THE ROAD";
+      p.textContent = "The wagon was a caption. You were sitting in the dark, typing into a log that went out over a dead frequency.";
+      p2.textContent = "The march thanks " + n + ".";
+      setScene(IMG.figures, false);
     }
     card.appendChild(code); card.appendChild(h); card.appendChild(p); card.appendChild(p2); card.appendChild(again);
     $("end").classList.remove("hidden");
@@ -506,29 +442,23 @@
 
   function applyFx(table, roll) {
     if (roll.ok) {
-      if (table.okFood) state.food += table.okFood;
-      if (table.okMiles) state.miles += table.okMiles;
+      if (table.food) state.food += table.food;
+      if (table.miles) state.miles += table.miles;
       if (table.bless) state.blessed = true;
+      if (table.miles) {
+        state.food = Math.max(0, state.food - 1);
+        if (state.oil > 0 && Math.random() < 0.35) state.oil -= 1;
+      }
     } else {
       state.food = Math.max(0, state.food - 1);
-      if (table.killFail || roll.fumble) killOne(roll.fumble ? "the reel skipped" : "the attempt failed");
-    }
-    if (state.food > 0 && (table.okMiles || !roll.ok)) {
-      /* travel always costs */
-    }
-    if (roll.ok && (table.okMiles || table.ok === 19 || table.ok === 60 || table.ok === 90)) {
-      state.food = Math.max(0, state.food - 1);
-      if (state.oil > 0 && Math.random() < 0.35) state.oil -= 1;
+      if (table.killFail || roll.fumble) killOne(roll.fumble ? "the reel skipped" : "the attempt tore");
     }
     hud();
   }
 
-  function goPage(id) {
-    if (id == null) { ending("missing"); return; }
-    if (id === 100) { ending("deliver"); return; }
-    if (id === 101) { ending("dark"); return; }
-    if (id === 102) { ending("tape"); return; }
-    cutTo(id, function () { showNode(id); unlock(); });
+  function goLoc(id) {
+    if (!id || String(id).indexOf("end-") === 0) { ending(id || "missing"); return; }
+    cutTo(LOCS[id] ? LOCS[id].name : "STATIC", function () { showLoc(id); unlock(); });
   }
 
   function unlock() {
@@ -539,8 +469,8 @@
 
   function submit(text) {
     if (state.ended || state.busy) return;
-    const node = NODES[state.page];
-    if (!node) return;
+    const loc = LOCS[state.loc];
+    if (!loc) return;
     const raw = String(text || "").trim();
     if (!raw) return;
     state.busy = true;
@@ -554,11 +484,11 @@
       return;
     }
     if (act === "back") {
-      WQRTAudio.hitch();
-      const dest = state.lastPage && state.lastPage !== state.page ? 23 : 24;
-      journal("YOU TRIED TO REWIND. THE PRINTING DOES NOT ALLOW IT.", "ghost");
-      playClip({ img: node.img, fail: true, caption: raw, label: "DO NOT REWIND", scare: true }, function () {
-        goPage(dest);
+      TapeAudio.hitch();
+      journal("YOU TRIED TO REWIND. THE REEL DOES NOT ALLOW IT.", "ghost");
+      const dest = state.lastLoc && state.lastLoc !== state.loc ? "woods" : "figures";
+      showDie(secretRoll(18)).then(function () {
+        playClip({ img: loc.img, fail: true, caption: raw, label: "DO NOT REWIND", scare: true }, function () { goLoc(dest); });
       });
       return;
     }
@@ -566,46 +496,45 @@
       state.marked = true;
       $("tape-cc").textContent = "YES.";
       journal("THE TAPE ANSWERED.", "ghost");
-      playClip({ img: IMAGES.sat, caption: "YES.", label: "CONTINUITY", scare: false }, function () {
-        goPage(80);
+      showDie({ d: 20, mod: 0, why: [], total: 20, dc: 1, ok: true, crit: true, fumble: false }).then(function () {
+        playClip({ img: IMG.figures, caption: "YES.", label: "IT HEARD YOU", scare: false }, function () { goLoc("named"); });
       });
       return;
     }
 
-    const table = node.acts[act] || node.acts.improv;
+    const table = loc.acts[act] || loc.acts.improv;
     const roll = secretRoll(table.dc);
     state.moves += 1;
-    if (state.moves === 3) {
-      journal("A LINE YOU DID NOT WRITE: " + escapeName() + " is already in the chain.", "hand");
-      state.ghosted = true;
-    }
+    if (state.moves === 3) journal("A LINE YOU DID NOT WRITE: " + you() + " is already walking.", "hand");
     if (state.moves === 6) state.viewed = 1;
 
-    WQRTAudio.hitch();
+    TapeAudio.hitch();
     applyFx(table, roll);
 
-    const next = roll.fumble && table.fumble ? table.fumble : (roll.crit && table.crit ? table.crit : (roll.ok ? table.ok : table.bad));
+    const next = roll.ok ? table.ok : table.bad;
     const fail = !roll.ok;
-    const clipImg = fail && (next === 25 || next === 70 || next === 61) ? (next === 61 ? IMAGES.river : IMAGES.occupied) : node.img;
+    const clipImg = fail && (next === "figures" || next === "under") ? (next === "under" ? IMG.river : IMG.figures) : loc.img;
 
-    journal((fail ? "THE ATTEMPT DOES NOT HOLD. " : "THE REEL ALLOWS IT. ") + raw, fail ? "ghost" : "");
+    journal(raw, fail ? "ghost" : "");
 
     if (live().length <= 0) {
-      playClip({ img: IMAGES.occupied, fail: true, scare: true, caption: raw, label: "NO ONE LEFT TO WRITE" }, function () {
-        ending("tape");
+      showDie(roll).then(function () {
+        playClip({ img: IMG.figures, fail: true, scare: true, caption: raw, label: "NO ONE LEFT" }, function () { ending("tape"); });
       });
       return;
     }
 
-    playClip({
-      img: clipImg,
-      fail: fail,
-      scare: !!(fail && (table.scareFail || roll.fumble)),
-      caption: raw.toUpperCase(),
-      label: fail ? "FAILING  •  " + node.title : "HOLDING  •  " + node.title
-    }, function () {
-      if (roll.fumble && Math.random() < 0.22) goPage(null);
-      else goPage(next);
+    showDie(roll).then(function () {
+      playClip({
+        img: clipImg,
+        fail: fail,
+        scare: !!(fail && (table.scareFail || roll.fumble)),
+        caption: raw.toUpperCase(),
+        label: fail ? "TEARING  •  " + loc.name : "HOLDING  •  " + loc.name
+      }, function () {
+        if (roll.fumble && Math.random() < 0.22) goLoc(null);
+        else goLoc(next);
+      });
     });
   }
 
@@ -620,63 +549,53 @@
   function boot() {
     const card = $("boot-card");
     let step = 0;
-    let fails = 0;
-    const names = { a: "", b: "", c: "" };
     function show() {
       card.innerHTML = "";
       if (step === 0) {
-        const h = document.createElement("h1"); h.textContent = "WQRT-12";
-        const s = document.createElement("p"); s.textContent = "CONTINUITY ACCESS  •  ANNEX 12";
-        const p = document.createElement("p"); p.textContent = "You were given a station code. Do not read it on air. Headphones.";
-        const i = document.createElement("input"); i.placeholder = "STATION CODE"; i.autocomplete = "off";
+        const h = document.createElement("h1"); h.textContent = "THE PALE MARCH";
+        const s = document.createElement("p"); s.textContent = "A recovered reel. You were given a word.";
+        const p = document.createElement("p"); p.textContent = "Headphones. Do not rewind.";
+        const i = document.createElement("input"); i.placeholder = "THE WORD"; i.autocomplete = "off";
         const err = document.createElement("p");
-        const b = document.createElement("button"); b.textContent = "OPEN THE CHAIN";
+        const b = document.createElement("button"); b.textContent = "THREAD THE TAPE";
         async function tryCode() {
           const ok = await codeOk(i.value);
-          if (ok) { WQRTAudio.start(); WQRTAudio.beep(700, 0.1, 0.08); step = 1; show(); }
-          else {
-            fails += 1;
-            WQRTAudio.start(); WQRTAudio.beep(140, 0.25, 0.1);
-            err.textContent = fails >= 3 ? "NO CARRIER." : "DENIED.";
-          }
+          if (ok) { TapeAudio.start(); TapeAudio.beep(700, 0.1, 0.08); step = 1; show(); }
+          else { TapeAudio.start(); TapeAudio.beep(140, 0.25, 0.1); err.textContent = "NO CARRIER."; }
         }
         b.onclick = tryCode;
         i.addEventListener("keydown", function (e) { if (e.key === "Enter") tryCode(); });
         card.appendChild(h); card.appendChild(s); card.appendChild(p); card.appendChild(i); card.appendChild(b); card.appendChild(err);
         setTimeout(function () { i.focus(); }, 40);
       } else if (step === 1) {
-        const h = document.createElement("h1"); h.textContent = "THE SURVEY";
-        const p = document.createElement("p"); p.textContent = "This is not a night you sit through. It is a printing. You type what the wagon does. A die you cannot see decides if the reel allows it. The same sentence can live or drown.";
-        const p2 = document.createElement("p"); p2.textContent = "Analog horror. Oregon Trail. The page you turn to is not the next one.";
-        const b = document.createElement("button"); b.textContent = "I UNDERSTAND";
+        const h = document.createElement("h1"); h.textContent = "HOW THIS WORKS";
+        const p = document.createElement("p"); p.textContent = "You type what the wagon does. A d20 rolls in the open. Beat the number and the reel holds. Miss and it tears — same words, different ground. There are no correct choices. There are only checks.";
+        const b = document.createElement("button"); b.textContent = "NAME THE PARTY";
         b.onclick = function () { step = 2; show(); };
-        card.appendChild(h); card.appendChild(p); card.appendChild(p2); card.appendChild(b);
+        card.appendChild(h); card.appendChild(p); card.appendChild(b);
       } else if (step === 2) {
         const h = document.createElement("h1"); h.textContent = "NAME THE PARTY";
         const p = document.createElement("p"); p.textContent = "You, then three others. They can be lost. The caption may count an extra.";
         function field(ph) { const i = document.createElement("input"); i.maxLength = 16; i.placeholder = ph; return i; }
-        const you = field("YOUR NAME");
+        const youI = field("YOUR NAME");
         const a = field("COMPANION 1");
         const b = field("COMPANION 2");
         const c = field("COMPANION 3");
         const go = document.createElement("button"); go.textContent = "START THE REEL";
         go.onclick = function () {
-          state.name = (you.value || "UNLOGGED").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16) || "UNLOGGED";
-          names.a = (a.value || "ELLIS").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16);
-          names.b = (b.value || "HOLCOMB").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16);
-          names.c = (c.value || "KEENE").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16);
+          state.name = (youI.value || "UNLOGGED").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16) || "UNLOGGED";
           state.party = [
             { name: state.name, alive: true, you: true },
-            { name: names.a, alive: true },
-            { name: names.b, alive: true },
-            { name: names.c, alive: true }
+            { name: (a.value || "ELLIS").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16), alive: true },
+            { name: (b.value || "MARROW").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16), alive: true },
+            { name: (c.value || "VESS").replace(/[<>]/g, "").trim().toUpperCase().slice(0, 16), alive: true }
           ];
           $("boot").classList.add("hidden");
           $("app").classList.remove("hidden");
           start();
         };
-        card.appendChild(h); card.appendChild(p); card.appendChild(you); card.appendChild(a); card.appendChild(b); card.appendChild(c); card.appendChild(go);
-        setTimeout(function () { you.focus(); }, 40);
+        card.appendChild(h); card.appendChild(p); card.appendChild(youI); card.appendChild(a); card.appendChild(b); card.appendChild(c); card.appendChild(go);
+        setTimeout(function () { youI.focus(); }, 40);
       }
     }
     if (state.debug) {
@@ -684,12 +603,12 @@
       state.party = [
         { name: "VEGA", alive: true, you: true },
         { name: "ELLIS", alive: true },
-        { name: "HOLCOMB", alive: true },
-        { name: "KEENE", alive: true }
+        { name: "MARROW", alive: true },
+        { name: "VESS", alive: true }
       ];
       $("boot").classList.add("hidden");
       $("app").classList.remove("hidden");
-      WQRTAudio.start();
+      TapeAudio.start();
       start();
       return;
     }
@@ -697,15 +616,15 @@
   }
 
   function start() {
-    Object.keys(IMAGES).forEach(function (k) { const im = new Image(); im.src = IMAGES[k]; });
+    Object.keys(IMG).forEach(function (k) { const im = new Image(); im.src = IMG[k]; });
     $("move-form").addEventListener("submit", function (e) {
       e.preventDefault();
       submit($("move").value);
     });
-    journal("SURVEY BEGINS — OP " + escapeName());
-    journal("The die is not printed. Do not ask for it.");
+    journal("MARCH BEGINS — " + you());
+    journal("The die is in the open. Same words can drown twice.");
     hud();
-    showNode(12);
+    showLoc("road");
     $("move").focus();
   }
 

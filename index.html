@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex" />
-  <title>WQRT-12 — PROVINCIAL SURVEY</title>
-  <link rel="stylesheet" href="css/station.css" />
+  <title>THE PALE MARCH</title>
+  <link rel="stylesheet" href="css/tape.css" />
 </head>
 <body>
   <div id="boot" class="overlay">
@@ -14,22 +14,21 @@
 
   <div id="app" class="hidden">
     <header id="topbar">
-      <div class="brand">WQRT-12<small>PROVINCIAL SURVEY 1979</small></div>
-      <div class="vfd" id="page-num">PAGE 12</div>
+      <div class="brand">THE PALE MARCH<small>RECOVERED REEL</small></div>
+      <div class="vfd" id="place-name">THE BLACK ROAD</div>
       <div class="status-pills">
         <div class="pill on" id="pill-food">FOOD 12</div>
         <div class="pill on" id="pill-oil">OIL 8</div>
         <div class="pill on" id="pill-miles">MILES 0</div>
         <div class="pill on" id="pill-party">PARTY 4</div>
-        <div class="pill" id="pill-tape">TAPE</div>
       </div>
     </header>
 
-    <section id="tape-row">
-      <div class="monitor" id="mon-tape">
+    <section id="stage">
+      <div class="monitor">
         <div class="monitor-meta">
-          <span id="tape-id">VTR 2  •  SURVEY REEL</span>
-          <span class="tally hot">REC</span>
+          <span id="reel-id">REEL  •  DAY 4</span>
+          <span class="tally">REC</span>
         </div>
         <div class="screen-wrap">
           <div class="screen" id="tape">
@@ -41,20 +40,27 @@
             <div class="scare" id="tape-scare"></div>
             <div class="cc" id="tape-cc"></div>
             <div class="crawl-wrap" id="tape-crawl-wrap"><div class="crawl-text" id="tape-crawl"></div></div>
-            <div class="page-burn" id="page-burn">P.12</div>
           </div>
         </div>
-        <div class="src-label" id="tape-label">DAY 4  •  THE ROAD</div>
+        <div class="src-label" id="tape-label">THE BLACK ROAD</div>
       </div>
+
+      <aside id="die-tray">
+        <div class="die-label">CHECK</div>
+        <div class="die" id="die">—</div>
+        <div class="die-need" id="die-need">d20</div>
+        <div class="die-mod" id="die-mod"></div>
+        <div class="die-result" id="die-result"></div>
+      </aside>
     </section>
 
     <section id="desk">
-      <div class="panel story-panel">
-        <h3>THE PRINTING</h3>
+      <div class="panel">
+        <h3>THE REEL</h3>
         <div id="story"></div>
       </div>
       <div class="panel">
-        <h3>SURVEY LOG</h3>
+        <h3>MARCH LOG</h3>
         <div id="log"></div>
         <div class="party-line" id="party-line"></div>
       </div>
@@ -62,14 +68,14 @@
 
     <form id="move-form" autocomplete="off">
       <label for="move">WHAT DO YOU DO</label>
-      <input id="move" maxlength="140" placeholder="Type anything. The tape will try it." />
-      <button type="submit" id="btn-go">TURN THE PAGE</button>
+      <input id="move" maxlength="140" placeholder="Type the attempt. The die decides if it holds." />
+      <button type="submit" id="btn-go">ROLL</button>
     </form>
   </div>
 
   <div id="cut" class="overlay hidden">
     <div class="cut-snow"></div>
-    <div class="cut-page" id="cut-page">TURN TO PAGE 12</div>
+    <div class="cut-page" id="cut-page"></div>
   </div>
   <div id="end" class="overlay hidden">
     <div class="end-card" id="end-card"></div>

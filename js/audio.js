@@ -1,5 +1,4 @@
-/* WQRT-12 — original period beds (70s / 80s / 90s library style) + SFX.
-   Not licensed recordings. Synthesized to sit under analog broadcast. */
+/* Pale March — original period beds + SFX. Not licensed recordings. */
 (function (global) {
   const Audio = {
     ctx: null,
@@ -752,5 +751,5 @@
     Audio.cart();
   };
 
-  global.WQRTAudio = Audio;
+  global.TapeAudio = Audio;
 })(window);
