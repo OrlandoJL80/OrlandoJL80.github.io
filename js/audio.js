@@ -402,7 +402,7 @@
     const bus = tvBus();
     bus.out.gain.cancelScheduledValues(now());
     bus.out.gain.setValueAtTime(0, now());
-    bus.out.gain.linearRampToValueAtTime(0.85, now() + 0.45);
+    bus.out.gain.linearRampToValueAtTime(Audio._placeVol || 0.5, now() + 0.45);
     Audio._ahead = now() + 0.08;
     pumpMusic();
   }
@@ -704,6 +704,52 @@
     if (!Audio.master) return;
     Audio.master.gain.setTargetAtTime(0, now(), 0.2);
     stopMusic();
+    if (Audio._swellTimer) clearTimeout(Audio._swellTimer);
+  };
+
+  Audio.setMusicGain = function (v, t) {
+    const bus = tvBus();
+    const g = bus.out.gain;
+    g.cancelScheduledValues(now());
+    g.setValueAtTime(g.value || 0.0001, now());
+    g.linearRampToValueAtTime(Math.max(0.02, Math.min(0.95, v)), now() + (t || 0.8));
+  };
+
+  Audio.setPlace = function (place) {
+    const map = {
+      road: 0.42, woods: 0.16, river: 0.34, camp: 0.6,
+      village: 0.26, church: 0.52, tower: 0.74, studio: 0.33,
+      tape: 0.12, sat: 0.48, scare: 0.9
+    };
+    Audio._place = place;
+    Audio._placeVol = map[place] != null ? map[place] : 0.4;
+    Audio._startSwell();
+  };
+
+  Audio._startSwell = function () {
+    if (Audio._swellTimer) clearTimeout(Audio._swellTimer);
+    const tick = function () {
+      if (!Audio._music) return;
+      const base = Audio._placeVol || 0.4;
+      const wander = (Math.random() - 0.42) * 0.38;
+      const v = base + wander + (Audio.corruption || 0) * 0.12;
+      Audio.setMusicGain(v, 0.9 + Math.random() * 2.4);
+      fadeBed("hiss", 0.03 + Math.random() * 0.05 + (Audio.corruption || 0) * 0.1, 1.5);
+      Audio._swellTimer = setTimeout(tick, 2200 + Math.random() * 5200);
+    };
+    tick();
+  };
+
+  Audio.hitch = function () {
+    const bus = tvBus();
+    const g = bus.out.gain;
+    const t = now();
+    const cur = g.value || 0.3;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(cur, t);
+    g.linearRampToValueAtTime(0.02, t + 0.07);
+    g.linearRampToValueAtTime(cur, t + 0.38);
+    Audio.cart();
   };
 
   global.WQRTAudio = Audio;
